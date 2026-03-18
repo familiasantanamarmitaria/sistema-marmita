@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a73e8">
+    <title>Marmitaria Santana v7.2</title>
+    <style>
+        /* [Seu CSS original mantido integralmente] */
+        :root { --primary: #1a73e8; --success: #27ae60; --warning: #f1c40f; --danger: #d93025; --bg: #f1f3f4; --border: #dadce0; --text: #3c4043; --whatsapp: #25d366; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        header { background: white; padding: 12px 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; z-index: 10; }
+        .total-valor { font-size: 1.3rem; font-weight: 800; color: var(--success); }
+        .container { flex: 1; padding: 12px; overflow-y: auto; padding-bottom: 90px; }
+        .card-pedido { background: white; border-radius: 12px; margin-bottom: 12px; padding: 15px; border-left: 6px solid var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .card-pedido.status-entrega { border-left-color: var(--warning); background: #fffdf0; }
+        .card-pedido.status-concluido { border-left-color: var(--success); opacity: 0.6; }
+        .actions-card { display: grid; grid-template-columns: 1fr 1fr 1fr 50px; gap: 6px; margin-top: 10px; }
+        .btn-status { border: none; padding: 12px 2px; border-radius: 6px; color: white; font-weight: bold; font-size: 0.65rem; text-transform: uppercase; cursor: pointer; }
+        nav.bottom-nav { position: fixed; bottom: 0; width: 100%; background: white; border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 10px 0 25px 0; z-index: 100; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; background: none; border: none; color: #5f6368; font-size: 0.75rem; font-weight: 600; }
+        .btn-add-main { background: var(--primary); color: white; width: 56px; height: 56px; border-radius: 28px; border: none; margin-top: -35px; box-shadow: 0 4px 12px rgba(26,115,232,0.4); font-size: 1.8rem; }
+        .drawer, .modal-full { position: fixed; bottom: -100%; left: 0; width: 100%; height: 94%; background: white; border-radius: 20px 20px 0 0; z-index: 200; transition: 0.3s; padding: 20px; display: flex; flex-direction: column; box-shadow: 0 -5px 20px rgba(0,0,0,0.1); }
+        .drawer.active, .modal-full.active { bottom: 0; }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; z-index: 150; }
+        input, select, textarea { width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 16px; margin-top: 5px; background: #f8f9fa; }
+        .carrinho-area { background:#f1f3f4; padding:12px; border-radius:10px; margin: 10px 0; }
+        .item-carrinho { display: flex; justify-content: space-between; background: white; padding: 10px; border-radius: 8px; margin-bottom: 5px; border: 1px solid #ddd; }
+        .rel-card { background: #3c4043; color: white; padding: 15px; border-radius: 12px; text-align: center; font-size: 0.9rem; }
+        .grid-rel { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 15px; }
+
+        @media print {
+            @page { margin: 0; size: auto; }
+            body { background: white; margin: 0; padding: 0; height: auto; }
+            header, nav, .container, .overlay, .drawer, .modal-full { display: none !important; }
+            #cupom-print { display: block !important; width: 58mm; margin: 0; padding: 2mm; font-family: monospace; font-size: 10pt; line-height: 1.2; color: black; }
+            hr { border: 0; border-top: 1px dashed black; margin: 5px 0; }
+        }
+        #cupom-print { display: none; }
+    </style>
+</head>
+<body>
+
+<audio id="som_caixa" src="https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3"></audio>
+
+<header>
+    <div><small>Hoje</small><br><span class="total-valor" id="total_dia">R$ 0,00</span></div>
+    <input type="date" id="filtro_data" onchange="listar()" style="width: auto; padding: 8px; margin:0;">
+</header>
+
+<div class="container" id="painel_cards"></div>
+
+<nav class="bottom-nav">
+    <button class="nav-item" onclick="abrirRelatorios()"><span>📊</span>Relatórios</button>
+    <button class="btn-add-main" onclick="abrirNovoPedido()">+</button>
+    <button class="nav-item" onclick="abrirProdutos()"><span>📦</span>Produtos</button>
+</nav>
+
+<div class="overlay" id="overlay" onclick="fecharTudo()"></div>
+
+<div class="drawer" id="drawer">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <h2 id="titulo_drawer" style="margin:0">Novo Pedido</h2>
+        <button onclick="fecharTudo()" style="border:none; background:#eee; width:36px; height:36px; border-radius:50%;">✕</button>
+    </div>
+    <div style="flex:1; overflow-y:auto;">
+        <div style="display: flex; gap: 10px;">
+            <div style="flex:1;"><label><small>Telefone</small></label><input type="text" id="f_tel" oninput="this.value=maskTel(this.value)" onblur="buscarCliente()" placeholder="(00) 00000-0000"></div>
+            <div style="flex:1.5;"><label><small>Nome</small></label><input type="text" id="f_cli"></div>
+        </div>
+        <label><small>Endereço Completo</small></label><input type="text" id="f_end">
+        <div id="secao_itens" class="carrinho-area">
+            <div style="display: flex; gap: 8px; align-items: flex-end;">
+                <div style="flex:2;"><label><small>Produto</small></label><select id="f_prod"></select></div>
+                <div style="width: 60px;"><label><small>Qtd</small></label><input type="number" id="f_qtd" value="1"></div>
+                <button onclick="addItem()" style="background:var(--success); color:white; border:none; height:48px; width:48px; border-radius:10px; font-weight:bold;">ADD</button>
+            </div>
+            <div id="carrinho_lista" style="margin-top:10px;"></div>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <div style="flex:1"><label><small>Pagamento</small></label><select id="f_pag"><option>Dinheiro</option><option>Pix</option><option>Cartão</option></select></div>
+            <div style="width:100px"><label><small>Taxa R$</small></label><input type="number" id="f_taxa" value="0" onchange="calcular()"></div>
+        </div>
+        <textarea id="f_obs" rows="2" placeholder="Observações e troco..." style="margin-top:10px;"></textarea>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 0;">
+            <b style="color:#666">TOTAL:</b>
+            <span id="f_total" style="font-size: 2rem; font-weight: 900; color: var(--success);">R$ 0,00</span>
+        </div>
+        <button class="btn-add-main" style="width:100%; border-radius:12px; margin-top:10px; font-size:1.1rem; height:60px;" onclick="salvar()">FINALIZAR E IMPRIMIR</button>
+        <div id="area_edicao" style="display:none; margin-top:10px; gap:10px;">
+            <button onclick="reimprimir()" style="flex:1; padding:15px; border-radius:10px; border:1px solid var(--border); background:#fff; font-weight:bold; height:60px;">🖨️ REIMPRIMIR</button>
+            <button onclick="excluirPedido()" style="flex:1; padding:15px; border-radius:10px; border:none; background:var(--danger); color:#fff; font-weight:bold; height:60px;">🗑️ EXCLUIR</button>
+        </div>
+    </div>
+</div>
+
+<div id="modal_produtos" class="modal-full">
+    <div style="display:flex; justify-content:space-between; align-items:center;"><h2>📦 Produtos</h2><button onclick="fecharTudo()" style="border:none; background:#eee; width:36px; height:36px; border-radius:50%;">✕</button></div>
+    <div class="carrinho-area">
+        <input type="text" id="p_nome" placeholder="Nome"><input type="number" id="p_preco" placeholder="R$" style="margin-top:8px">
+        <button onclick="salvarProduto()" style="width:100%; padding:15px; border-radius:10px; background:var(--primary); color:white; border:none; margin-top:10px; font-weight:bold;">+ CADASTRAR</button>
+    </div>
+    <div id="lista_cad_produtos" style="flex:1; overflow-y:auto;"></div>
+</div>
+
+<div id="modal_relatorio" class="modal-full">
+    <div style="display:flex; justify-content:space-between; align-items:center;"><h2>📊 Relatórios</h2><button onclick="fecharTudo()" style="border:none; background:#eee; width:36px; height:36px; border-radius:50%;">✕</button></div>
+    <select id="rel_periodo" onchange="gerarRelatorio()" style="margin-bottom:15px;"><option value="hoje">Hoje</option><option value="tudo">Histórico</option></select>
+    <div id="rel_financeiro" class="grid-rel"></div>
+    <button onclick="baixarPlanilha()" style="width:100%; margin-top:15px; padding:12px; border-radius:10px; background:#1a73e8; color:white; border:none; font-weight:bold; cursor:pointer;">📥 BAIXAR PLANILHA DO DIA</button>
+    <div class="carrinho-area" style="margin-top:15px;"><h3>🛵 Motoboy</h3><div id="rel_lista_taxas"></div></div>
+    <div class="carrinho-area" style="flex:1; overflow-y:auto;"><h3>🏆 Vendidos</h3><div id="rel_lista_prods"></div></div>
+</div>
+
+<div id="cupom-print"></div>
+
+<script>
+    // --- PWA REGISTRATION (ENGENHARIA SÊNIOR) ---
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('Service Worker ativo!', reg.scope))
+            .catch(err => console.log('Erro no Service Worker', err));
+        });
+    }
+
+    // --- LOGICA ORIGINAL PRESERVADA ---
+    let db, carrinho = [], idGen = parseInt(localStorage.getItem('id_gen')) || 1000, idAtual = null, pedidoDadosParaPrint = null;
+    let baseClientes = JSON.parse(localStorage.getItem('base_clientes_v2')) || {};
+    let produtosCad = JSON.parse(localStorage.getItem('prods_v4')) || [{n:"Marmita P", v:15}, {n:"Marmita M", v:20}];
+
+    const req = indexedDB.open("MarmitaVillaDB_v3", 1);
+    req.onupgradeneeded = e => { e.target.result.createObjectStore("pedidos", { keyPath: "id", autoIncrement: true }); };
+    req.onsuccess = e => { db = e.target.result; document.getElementById('filtro_data').valueAsDate = new Date(); listar(); atualizarSelectProds(); };
+
+    // [Todas as funções originais seguem aqui sem alterações para garantir estabilidade]
+    function maskTel(v) {
+        v = v.replace(/\D/g, "");
+        if (v.length > 11) v = v.substring(0, 11);
+        if (v.length > 10) v = v.replace(/^(\d{2})(\d{5})(\d{4}).*/, "($1) $2-$3");
+        else if (v.length > 5) v = v.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, "($1) $2-$3");
+        else if (v.length > 2) v = v.replace(/^(\d{2})(\d{0,5})/, "($1) $2");
+        else if (v.length > 0) v = v.replace(/^(\d*)/, "($1");
+        return v;
+    }
+
+    function atualizarSelectProds() { document.getElementById('f_prod').innerHTML = '<option value="">Selecione...</option>' + produtosCad.map(p => `<option value="${p.n}" data-p="${p.v}">${p.n} - R$ ${p.v.toFixed(2)}</option>`).join(''); }
+    function addItem() { const p = document.getElementById('f_prod'), q = document.getElementById('f_qtd').value; if(!p.value) return; const v = parseFloat(p.selectedOptions[0].dataset.p) * q; carrinho.push({ idTemp: Date.now(), txt: q + "x " + p.value, v: v, nomeItem: p.value, qtd: parseInt(q) }); renderCarrinho(); }
+    function renderCarrinho() { document.getElementById('carrinho_lista').innerHTML = carrinho.map(i => `<div class="item-carrinho"><span><b>${i.txt}</b></span><span style="color:red; font-weight:bold" onclick="removerItem(${i.idTemp})">Remover</span></div>`).join(''); calcular(); }
+    function removerItem(id) { carrinho = carrinho.filter(i => i.idTemp !== id); renderCarrinho(); }
+    function calcular() { const t = carrinho.reduce((a, b) => a + b.v, 0) + parseFloat(document.getElementById('f_taxa').value || 0); document.getElementById('f_total').innerText = "R$ " + t.toFixed(2).replace('.', ','); }
+
+    function listar() {
+        const dataF = document.getElementById('filtro_data').value;
+        db.transaction("pedidos").objectStore("pedidos").getAll().onsuccess = e => {
+            const lista = e.target.result.filter(p => p.data === dataF).reverse();
+            let html = "", soma = 0;
+            lista.forEach(p => {
+                soma += parseFloat(p.total.replace('R$ ', '').replace(',', '.'));
+                html += `<div class="card-pedido status-${p.status}" onclick="verDetalhes(${p.id})">
+                    <div style="display:flex; justify-content:space-between; font-weight:bold;"><span>#${p.num} - ${p.cli}</span> <span>${p.total}</span></div>
+                    <small style="color:#666">${p.resumo}</small>
+                    <div class="actions-card">
+                        <button class="btn-status" style="background:var(--primary)" onclick="mudarStatus(event, ${p.id}, 'pendente')">Cozinha</button>
+                        <button class="btn-status" style="background:var(--warning); color:#000" onclick="mudarStatus(event, ${p.id}, 'entrega')">Sair</button>
+                        <button class="btn-status" style="background:var(--success)" onclick="mudarStatus(event, ${p.id}, 'concluido')">OK</button>
+                        <button class="btn-status" style="background:var(--whatsapp)" onclick="reviarZapCard(event, ${p.id})">📲</button>
+                    </div>
+                </div>`;
+            });
+            document.getElementById('painel_cards').innerHTML = html || "<center style='margin-top:50px; color:#999'>Nenhum pedido hoje.</center>";
+            document.getElementById('total_dia').innerText = "R$ " + soma.toFixed(2).replace('.', ',');
+        };
+    }
+
+    function salvar() {
+        const nome = document.getElementById('f_cli').value.toUpperCase();
+        const telefone = document.getElementById('f_tel').value;
+        const endereco = document.getElementById('f_end').value.toUpperCase();
+        if(!nome || (carrinho.length === 0 && !idAtual)) return alert("Preencha cliente e produtos!");
+        if(telefone && telefone.length > 5) {
+            baseClientes[telefone.replace(/\D/g,"")] = { nome: nome, endereco: endereco, original: telefone };
+            localStorage.setItem('base_clientes_v2', JSON.stringify(baseClientes));
+        }
+        const dados = {
+            data: document.getElementById('filtro_data').value,
+            cli: nome, tel: telefone, end: endereco,
+            obs: document.getElementById('f_obs').value, taxa: document.getElementById('f_taxa').value,
+            resumo: idAtual ? document.getElementById('titulo_drawer').dataset.resumo : carrinho.map(i => i.txt).join(", "),
+            itensArray: idAtual ? [] : carrinho.map(i => ({n: i.nomeItem, q: i.qtd})),
+            pag: document.getElementById('f_pag').value, total: document.getElementById('f_total').innerText, status: 'pendente'
+        };
+        const tx = db.transaction("pedidos", "readwrite");
+        if(idAtual) {
+            tx.objectStore("pedidos").get(idAtual).onsuccess = e => {
+                const old = e.target.result;
+                tx.objectStore("pedidos").put({...old, ...dados, id: idAtual}).onsuccess = () => { fecharTudo(); listar(); };
+            };
+        } else {
+            dados.num = idGen;
+            tx.objectStore("pedidos").add(dados).onsuccess = () => {
+                document.getElementById('som_caixa').play().catch(()=>{});
+                idGen++; localStorage.setItem('id_gen', idGen);
+                gerarImpressao(dados);
+                enviarZap(dados);
+                fecharTudo(); listar();
+                setTimeout(() => { window.print(); }, 700);
+            };
+        }
+    }
+
+    function gerarImpressao(p) {
+        document.getElementById('cupom-print').innerHTML = `
+            <div style="text-align:center; font-weight:bold; font-size:12pt">MARMITARIA SANTANA</div>
+            <div style="text-align:center; font-size:18pt">#${p.num}</div>
+            <hr>
+            <b>CLI:</b> ${p.cli}<br>
+            <b>TEL:</b> ${p.tel}<br>
+            <b>END:</b> ${p.end}<hr>
+            <b>ITENS:</b><br>${p.resumo.split(', ').join('<br>')}<hr>
+            <b>OBS:</b> ${p.obs || 'N/A'}<br>
+            <b>TAXA:</b> R$ ${parseFloat(p.taxa).toFixed(2)}<br>
+            <b>PAG:</b> ${p.pag}<br>
+            <div style="font-size:14pt; font-weight:bold">TOTAL: ${p.total}</div>`;
+    }
+
+    function verDetalhes(id) {
+        idAtual = id;
+        db.transaction("pedidos").objectStore("pedidos").get(id).onsuccess = e => {
+            const p = e.target.result;
+            pedidoDadosParaPrint = p;
+            document.getElementById('f_cli').value = p.cli; 
+            document.getElementById('f_end').value = p.end;
+            document.getElementById('f_tel').value = p.tel || ''; 
+            document.getElementById('f_taxa').value = p.taxa;
+            document.getElementById('f_total').innerText = p.total; 
+            document.getElementById('f_obs').value = p.obs;
+            document.getElementById('f_pag').value = p.pag;
+            document.getElementById('titulo_drawer').innerText = "Pedido #" + p.num;
+            document.getElementById('titulo_drawer').dataset.resumo = p.resumo;
+            document.getElementById('area_edicao').style.display = 'flex';
+            document.getElementById('secao_itens').style.display = 'none';
+            document.getElementById('drawer').classList.add('active');
+            document.getElementById('overlay').style.display = 'block';
+        };
+    }
+
+    function reimprimir() { 
+        if(pedidoDadosParaPrint) { 
+            gerarImpressao(pedidoDadosParaPrint); 
+            setTimeout(() => { window.print(); }, 700); 
+        } else { alert("Erro: Selecione o pedido novamente."); }
+    }
+
+    function fecharTudo() { document.querySelectorAll('.drawer, .modal-full').forEach(m => m.classList.remove('active')); document.getElementById('overlay').style.display = 'none'; }
+    
+    function abrirNovoPedido() { 
+        idAtual = null; 
+        carrinho = []; 
+        document.querySelectorAll('#drawer input:not([type=date])').forEach(i => i.value = ''); 
+        document.getElementById('f_obs').value = '';
+        document.getElementById('f_qtd').value = '1';
+        document.getElementById('f_taxa').value = '0';
+        document.getElementById('f_total').innerText = 'R$ 0,00';
+        document.getElementById('carrinho_lista').innerHTML = '';
+        document.getElementById('titulo_drawer').innerText = "Novo Pedido";
+        document.getElementById('area_edicao').style.display = 'none'; 
+        document.getElementById('secao_itens').style.display = 'block'; 
+        document.getElementById('drawer').classList.add('active'); 
+        document.getElementById('overlay').style.display = 'block'; 
+    }
+
+    function mudarStatus(e, id, s) { e.stopPropagation(); const tx = db.transaction("pedidos", "readwrite"); tx.objectStore("pedidos").get(id).onsuccess = ev => { const p = ev.target.result; p.status = s; tx.objectStore("pedidos").put(p).onsuccess = () => listar(); }; }
+    function reviarZapCard(e, id) { e.stopPropagation(); db.transaction("pedidos").objectStore("pedidos").get(id).onsuccess = e => enviarZap(e.target.result); }
+    function enviarZap(p) { if(p.tel) window.open(`https://api.whatsapp.com/send?phone=55${p.tel.replace(/\D/g,"")}&text=${encodeURIComponent("*Pedido #"+p.num+"*\n"+p.resumo+"\nTotal: "+p.total)}`); }
+    function buscarCliente() { 
+        const tel = document.getElementById('f_tel').value.replace(/\D/g,""); 
+        if(baseClientes[tel]) { 
+            document.getElementById('f_cli').value = baseClientes[tel].nome; 
+            document.getElementById('f_end').value = baseClientes[tel].endereco; 
+        } 
+    }
+    function excluirPedido() { if(confirm("Apagar pedido?")) { db.transaction("pedidos", "readwrite").objectStore("pedidos").delete(idAtual).onsuccess = () => { fecharTudo(); listar(); }; } }
+    function abrirProdutos() { document.getElementById('modal_produtos').classList.add('active'); renderListaProds(); }
+    function salvarProduto() { 
+        const n = document.getElementById('p_nome').value.toUpperCase(), v = document.getElementById('p_preco').value; 
+        if(n&&v){ 
+            produtosCad.push({n, v:parseFloat(v)}); 
+            localStorage.setItem('prods_v4', JSON.stringify(produtosCad)); 
+            document.getElementById('p_nome').value = ''; document.getElementById('p_preco').value = '';
+            renderListaProds(); atualizarSelectProds(); 
+        } 
+    }
+    function excluirProduto(index) {
+        if(confirm("Deseja excluir este produto da lista?")) {
+            produtosCad.splice(index, 1);
+            localStorage.setItem('prods_v4', JSON.stringify(produtosCad));
+            renderListaProds();
+            atualizarSelectProds();
+        }
+    }
+    function renderListaProds() { 
+        document.getElementById('lista_cad_produtos').innerHTML = produtosCad.map((p, i) => `
+            <div style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center">
+                <span>${p.n} - <b>R$ ${p.v.toFixed(2)}</b></span>
+                <button onclick="excluirProduto(${i})" style="background:var(--danger); color:white; border:none; padding:5px 10px; border-radius:5px; font-weight:bold">🗑️</button>
+            </div>`).join(''); 
+    }
+    function abrirRelatorios() { document.getElementById('modal_relatorio').classList.add('active'); gerarRelatorio(); }
+    function gerarRelatorio() {
+        const periodo = document.getElementById('rel_periodo').value;
+        db.transaction("pedidos").objectStore("pedidos").getAll().onsuccess = e => {
+            let peds = e.target.result;
+            if(periodo === 'hoje') peds = peds.filter(x => x.data === document.getElementById('filtro_data').value);
+            let fin = {Dinheiro:0, Pix:0, Cartão:0}, tTaxa = 0, pMap = {};
+            peds.forEach(p => {
+                let v = parseFloat(p.total.replace('R$ ', '').replace(',', '.'));
+                fin[p.pag] += v; tTaxa += parseFloat(p.taxa || 0);
+                p.resumo.split(', ').forEach(txt => {
+                    let partes = txt.split('x '), q = parseInt(partes[0]) || 1, n = partes[1] || txt;
+                    pMap[n] = (pMap[n] || 0) + q;
+                });
+            });
+            document.getElementById('rel_financeiro').innerHTML = `
+                <div class="rel-card">DINHEIRO<br>R$ ${fin.Dinheiro.toFixed(2)}</div>
+                <div class="rel-card">PIX<br>R$ ${fin.Pix.toFixed(2)}</div>
+                <div class="rel-card">CARTÃO<br>R$ ${fin.Cartão.toFixed(2)}</div>
+                <div class="rel-card" style="background:var(--success); grid-column: span 3; font-weight:bold; font-size:1.1rem; margin-top:5px">TOTAL GERAL: R$ ${(fin.Dinheiro+fin.Pix+fin.Cartão).toFixed(2)}</div>`;
+            document.getElementById('rel_lista_taxas').innerHTML = `<b>Total Taxas Motoboy: R$ ${tTaxa.toFixed(2)}</b><br><small>${peds.length} entregas realizadas</small>`;
+            document.getElementById('rel_lista_prods').innerHTML = Object.entries(pMap).sort((a,b)=>b[1]-a[1]).map(([n,q])=>`<div>${n}: <b>${q}</b></div>`).join('');
+        };
+    }
+    function baixarPlanilha() {
+        const dataF = document.getElementById('filtro_data').value;
+        db.transaction("pedidos").objectStore("pedidos").getAll().onsuccess = e => {
+            const peds = e.target.result.filter(x => x.data === dataF);
+            if(peds.length === 0) return alert("Nenhum pedido para exportar nesta data.");
+            let csv = "Pedido;Data;Cliente;Endereco;Itens;Total;Pagamento\n";
+            peds.forEach(p => {
+                csv += `${p.num};${p.data};${p.cli};${p.end};${p.resumo};${p.total};${p.pag}\n`;
+            });
+            const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", `pedidos_${dataF}.csv`);
+            link.click();
+        };
+    }
+</script>
+</body>
+</html>
