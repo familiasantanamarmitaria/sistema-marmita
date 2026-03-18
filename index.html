@@ -129,6 +129,7 @@
 
   const app = initializeApp(firebaseConfig);
   const dbCloud = getFirestore(app);
+  console.log(" Firebase Inicializado: ", dbCloud.app.options.projectId);
 
   window.enviarParaCloud = async function(pedido) {
     if (!navigator.onLine) return;
