@@ -11,7 +11,28 @@
       "src": "https://cdn-icons-png.flaticon.com/512/1046/1046747.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1046/1046747.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "https://via.placeholder.com/1280x720.png?text=Marmitaria+Santana+Desktop",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Painel de Pedidos Desktop"
+    },
+    {
+      "src": "https://via.placeholder.com/390x844.png?text=Marmitaria+Santana+Mobile",
+      "sizes": "390x844",
+      "type": "image/png",
+      "label": "Gestão de Pedidos no Celular"
     }
   ]
 }
